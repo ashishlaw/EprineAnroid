@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "734526453468",
+    "firebase_url": "https://eprine-62ad5.firebaseio.com",
+    "project_id": "eprine-62ad5",
+    "storage_bucket": "eprine-62ad5.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:734526453468:android:fa91b394c21eadb592a619",
+        "android_client_info": {
+          "package_name": "com.eprine"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "734526453468-gl9sg971j60f6ajudhd0c7jkbdfuuhel.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAey01Lupv6yF-tOjS3P05ysUWaok8ABpY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "734526453468-gl9sg971j60f6ajudhd0c7jkbdfuuhel.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
