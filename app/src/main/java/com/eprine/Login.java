@@ -1,35 +1,45 @@
 package com.eprine;
 
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
-
 import android.Manifest;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.text.method.HideReturnsTransformationMethod;
 import android.text.method.PasswordTransformationMethod;
 import android.util.Log;
+import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.Window;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.PopupWindow;
 import android.widget.RelativeLayout;
 import android.widget.Toast;
 
+import com.eprine.adapters.PopupRecyclerViewAdapter;
+import com.eprine.controller.SharedPrefEmail;
 import com.eprine.customcontrols.TextViewRegular;
+import com.eprine.propertyClasses.CheckLogin;
+import com.eprine.propertyClasses.LoginData;
 import com.eprine.propertyClasses.LoginProp;
+import com.eprine.propertyClasses.UserDetails;
 import com.eprine.retrofitclasses.ApiClient;
 import com.eprine.retrofitclasses.ApiInterface;
 import com.google.android.material.snackbar.Snackbar;
 import com.google.gson.Gson;
 import com.onesignal.OneSignal;
 
-import java.io.IOException;
-
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -40,7 +50,7 @@ import static android.Manifest.permission.CAMERA;
 import static android.Manifest.permission.RECORD_AUDIO;
 import static android.Manifest.permission.WRITE_EXTERNAL_STORAGE;
 
-public class Login extends AppCompatActivity {
+public class Login extends AppCompatActivity implements PopupRecyclerViewAdapter.Listener {
 
     public static final int RequestPermissionCode = 1;
 
@@ -49,10 +59,11 @@ public class Login extends AppCompatActivity {
     private String JWTtoken;
     String deviceId = "";
     boolean isClicked = false;
-    private CheckBox biometricsCB;
+    private CheckBox biometricsCB, rememberMeCB;
     ImageView showPasswordIV;
     private RelativeLayout mainRL;
     private TextViewRegular forgotPasswordTV;
+    private PopupWindow popupWindow = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -81,7 +92,17 @@ public class Login extends AppCompatActivity {
         loginBT = findViewById(R.id.loginBT);
         showPasswordIV = findViewById(R.id.showPasswordIV);
         biometricsCB = findViewById(R.id.biometricsCB);
+        rememberMeCB = findViewById(R.id.rememberMeCB);
         forgotPasswordTV = findViewById(R.id.forgotPasswordTV);
+
+        String isChecked = SharedPrefEmail.getStringEmail(Login.this, "isChecked");
+        rememberMeCB.setChecked(isChecked.equalsIgnoreCase("checked"));
+
+        String userEmail = SharedPrefEmail.getStringEmail(Login.this, "userEmail");
+
+        if (!userEmail.isEmpty()) {
+            emailAddressET.setText(userEmail);
+        }
 
         forgotPasswordTV.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -96,9 +117,11 @@ public class Login extends AppCompatActivity {
             public void onClick(View v) {
                 if (!isClicked) {
                     passwordET.setTransformationMethod(HideReturnsTransformationMethod.getInstance());
+                    passwordET.setSelection(passwordET.getText().length());
                     isClicked = true;
                 } else {
                     passwordET.setTransformationMethod(PasswordTransformationMethod.getInstance());
+                    passwordET.setSelection(passwordET.getText().length());
                     isClicked = false;
                 }
             }
@@ -120,8 +143,10 @@ public class Login extends AppCompatActivity {
                     snackbar.show();
                 } else {
                     Dialogs.baseShowProgressDialog(Login.this, "Logging In...");
-                    loginService(emailAddress, password, "eprine", deviceId);
+
+                    checkLogin(emailAddress, password);
                 }
+
             }
         });
     }
@@ -172,7 +197,7 @@ public class Login extends AppCompatActivity {
                 FifthPermission == PackageManager.PERMISSION_GRANTED;
     }
 
-    public void loginService(String username, String password, String app_name, String device_id) {
+    public void checkLogin(String username, String password) {
         if (!Dialogs.isInternetAvailable(this)) {
             Dialogs.baseHideProgressDialog();
             Dialogs.showToast(this, "Internet Not Available!");
@@ -180,14 +205,105 @@ public class Login extends AppCompatActivity {
         }
 
         ApiInterface apiInterface = ApiClient.getClientWithToken(Login.this).create(ApiInterface.class);
-        apiInterface.loginAPI(username, password, app_name, device_id).enqueue(new Callback<LoginProp>() {
+        apiInterface.checkLoginAPI(username, password).enqueue(new Callback<CheckLogin>() {
+            @Override
+            public void onResponse(Call<CheckLogin> call, Response<CheckLogin> response) {
+                Dialogs.baseHideProgressDialog();
+                if (response.isSuccessful()) {
+                    if (response.body().getStatus()) {
+                        showLoginSelectionPopup(response.body().getData());
+                    }
+                } else {
+                    try {
+                        Gson gsonObj = new Gson();
+                        LoginProp loginError = gsonObj.fromJson(response.errorBody().string(), LoginProp.class);
+                        if (!loginError.getMessage().isEmpty()) {
+                            Toast.makeText(getApplicationContext(), loginError.getMessage(), Toast.LENGTH_SHORT).show();
+                        } else {
+                            Toast.makeText(getApplicationContext(), "Unable to Login", Toast.LENGTH_SHORT).show();
+                        }
+                    } catch (Exception e) {
+                        Toast.makeText(getApplicationContext(), "Unable to Login", Toast.LENGTH_SHORT).show();
+                        e.printStackTrace();
+                    }
+                }
+            }
+
+            @Override
+            public void onFailure(Call<CheckLogin> call, Throwable t) {
+                Dialogs.baseHideProgressDialog();
+                Log.e("erroroororoororororor", t.getMessage());
+                Toast.makeText(getApplicationContext(), "Unable to Login", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    public static void dimBehind(PopupWindow popupWindow) {
+        View container;
+        if (popupWindow.getBackground() == null) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                container = (View) popupWindow.getContentView().getParent();
+            } else {
+                container = popupWindow.getContentView();
+            }
+        } else {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                container = (View) popupWindow.getContentView().getParent().getParent();
+            } else {
+                container = (View) popupWindow.getContentView().getParent();
+            }
+        }
+        Context context = popupWindow.getContentView().getContext();
+        WindowManager wm = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+        WindowManager.LayoutParams p = (WindowManager.LayoutParams) container.getLayoutParams();
+        p.flags = WindowManager.LayoutParams.FLAG_DIM_BEHIND;
+        p.dimAmount = 0.3f;
+        wm.updateViewLayout(container, p);
+    }
+
+    private void showLoginSelectionPopup(LoginData data) {
+
+        View popupView = LayoutInflater.from(this).inflate(R.layout.recycler_popup_window, null);
+        popupWindow = new PopupWindow(popupView, WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
+
+        //dimBehind(popupWindow);
+
+        RecyclerView recyclerView = popupView.findViewById(R.id.rv_recycler_view);
+        RecyclerView.LayoutManager mLayoutManager = new LinearLayoutManager(getApplicationContext());
+        recyclerView.setLayoutManager(mLayoutManager);
+        PopupRecyclerViewAdapter adapter = new PopupRecyclerViewAdapter(this, this, data.getUsers());
+        recyclerView.setAdapter(adapter);
+
+        popupWindow.showAtLocation(popupView, Gravity.CENTER, 0, 0);
+
+    }
+
+    public void loginService(String username, String password, String user_id) {
+        if (!Dialogs.isInternetAvailable(this)) {
+            Dialogs.baseHideProgressDialog();
+            Dialogs.showToast(this, "Internet Not Available!");
+            return;
+        }
+
+        ApiInterface apiInterface = ApiClient.getClientWithToken(Login.this).create(ApiInterface.class);
+        apiInterface.loginAPI(username, password, user_id).enqueue(new Callback<LoginProp>() {
             @Override
             public void onResponse(Call<LoginProp> call, Response<LoginProp> response) {
                 Dialogs.baseHideProgressDialog();
                 if (response.isSuccessful()) {
                     if (response.body().getStatus()) {
                         JWTtoken = response.body().getData().getJwt().getIdToken();
-                        SharedPreferences.setString(Login.this, "loggedIn", "loggedIn");
+
+                        if (rememberMeCB.isChecked()) {
+                            SharedPreferences.setString(Login.this, "loggedIn", "loggedIn");
+                            SharedPrefEmail.setStringEmail(Login.this, "isChecked", "checked");
+                            SharedPrefEmail.setStringEmail(Login.this, "userEmail", emailAddressET.getText().toString().trim());
+                        } else {
+                            SharedPreferences.setString(Login.this, "loggedIn", "");
+                            SharedPrefEmail.setStringEmail(Login.this, "isChecked", "");
+                            SharedPrefEmail.setStringEmail(Login.this, "userEmail", "");
+                        }
+
                         SharedPreferences.setString(Login.this, "token", JWTtoken);
                         SharedPreferences.setString(Login.this, "deviceID", response.body().getDeviceId());
                         SharedPreferences.setString(Login.this, "biometricEnabled", "");
@@ -205,15 +321,21 @@ public class Login extends AppCompatActivity {
                         Gson gsonObj = new Gson();
                         LoginProp loginError = gsonObj.fromJson(response.errorBody().string(), LoginProp.class);
                         Toast.makeText(getApplicationContext(), loginError.getMessage(), Toast.LENGTH_SHORT).show();
-                    } catch (IOException e) {
+                    } catch (Exception e) {
                         e.printStackTrace();
                     }
+                }
+                if (popupWindow != null) {
+                    popupWindow.dismiss();
                 }
             }
 
             @Override
             public void onFailure(Call<LoginProp> call, Throwable t) {
                 Dialogs.baseHideProgressDialog();
+                if (popupWindow != null) {
+                    popupWindow.dismiss();
+                }
                 Log.e("erroroororoororororor", t.getMessage());
                 Toast.makeText(getApplicationContext(), "Unable to Login", Toast.LENGTH_SHORT).show();
             }
@@ -224,5 +346,11 @@ public class Login extends AppCompatActivity {
     public void onBackPressed() {
         super.onBackPressed();
         finish();
+    }
+
+    @Override
+    public void onItemClicked(UserDetails userDetails) {
+        Dialogs.baseShowProgressDialog(Login.this, "Logging In...");
+        loginService(emailAddressET.getText().toString(), passwordET.getText().toString(), userDetails.getId().toString());
     }
 }

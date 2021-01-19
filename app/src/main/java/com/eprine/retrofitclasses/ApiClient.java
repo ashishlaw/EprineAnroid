@@ -23,8 +23,8 @@ import retrofit2.converter.gson.GsonConverterFactory;
 public class ApiClient {
     private static Retrofit retrofit = null;
     //public static final String Base_url = "https://test.adaptivetelehealth.com/index.php/api/";
-    // private static final String Base_url = "https://eprine.test.adaptivetelehealth.com/index.php/api/";
     private static final String Base_url = "https://eprine.adaptivetelehealth.com/index.php/api/";
+    //private static final String Base_url = "https://eprine.adaptivetelehealth.com/index.php/api/";
 
     public static Retrofit getClientWithToken(Context context) {
 

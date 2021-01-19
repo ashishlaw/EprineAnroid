@@ -11,6 +11,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.net.Uri;
+import android.net.http.SslError;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -19,6 +20,7 @@ import android.provider.MediaStore;
 import android.util.Log;
 import android.webkit.GeolocationPermissions;
 import android.webkit.JsResult;
+import android.webkit.SslErrorHandler;
 import android.webkit.ValueCallback;
 import android.webkit.WebBackForwardList;
 import android.webkit.WebChromeClient;
@@ -47,6 +49,7 @@ public class HomeScreen extends AppCompatActivity implements OSSubscriptionObser
     /*-- you can customize these options for your convenience --*/
     //  private static String webview_url = "https://camali.adaptivetelehealth.com/index.php/login";    // web address or local file location you want to open in webview
     //private static String webview_url = "https://test.adaptivetelehealth.com/index.php/login/mobile_login/";
+    //private static String webview_url = "https://eprine.adaptivetelehealth.com/index.php/login/mobile_login/";
     private static String webview_url = "https://eprine.adaptivetelehealth.com/index.php/login/mobile_login/";
 
     private static String file_type = "image/*";    // file types to be allowed for upload
@@ -59,14 +62,14 @@ public class HomeScreen extends AppCompatActivity implements OSSubscriptionObser
     private boolean clearHistory;
     private String cam_file_data = null;        // for storing camera file information
     private ValueCallback<Uri> file_data;       // data/header received after file selection
-    private ValueCallback<Uri[]> file_path;     // received file(s) temp. location
+    private ValueCallback<Uri[]> file_path;     // received file(s) temp. location 
     private String deviceId = "";
     private final static int file_req_code = 1;
     private String JWtoken;
     private String deviceID;
-    private  GeolocationPermissions.Callback mGeoLocationCallback;
-    private  String mGeoLocationOrigin;
-     private static final int  MY_LOCATION_REQUEST= 2;
+    private GeolocationPermissions.Callback mGeoLocationCallback;
+    private String mGeoLocationOrigin;
+    private static final int MY_LOCATION_REQUEST = 2;
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent intent) {
@@ -166,8 +169,8 @@ public class HomeScreen extends AppCompatActivity implements OSSubscriptionObser
 
             @Override
             public void onGeolocationPermissionsShowPrompt(final String origin, final GeolocationPermissions.Callback callback) {
-                if (ContextCompat.checkSelfPermission(HomeScreen.this, Manifest.permission.ACCESS_FINE_LOCATION )!= PackageManager.PERMISSION_GRANTED){
-                    if (ActivityCompat.shouldShowRequestPermissionRationale(HomeScreen.this, Manifest.permission.ACCESS_FINE_LOCATION)){
+                if (ContextCompat.checkSelfPermission(HomeScreen.this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                    if (ActivityCompat.shouldShowRequestPermissionRationale(HomeScreen.this, Manifest.permission.ACCESS_FINE_LOCATION)) {
                         new AlertDialog.Builder(HomeScreen.this)
                                 .setMessage("Permission for Access Location")
                                 .setNeutralButton("OK", new DialogInterface.OnClickListener() {
@@ -184,10 +187,11 @@ public class HomeScreen extends AppCompatActivity implements OSSubscriptionObser
                         mGeoLocationOrigin = origin;
                         ActivityCompat.requestPermissions(HomeScreen.this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, MY_LOCATION_REQUEST);
                     }
-                } else  {
+                } else {
                     callback.invoke(origin, true, true);
                 }
             }
+
             @Override
             public boolean onJsConfirm(WebView view, String url, String message, final JsResult result) {
                 new AlertDialog.Builder(HomeScreen.this)
@@ -350,14 +354,13 @@ public class HomeScreen extends AppCompatActivity implements OSSubscriptionObser
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         switch (requestCode) {
-            case MY_LOCATION_REQUEST : {
-                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED){
-                    if (mGeoLocationCallback != null){
+            case MY_LOCATION_REQUEST: {
+                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    if (mGeoLocationCallback != null) {
                         mGeoLocationCallback.invoke(mGeoLocationOrigin, true, true);
                     }
-                }
-                else {
-                    if (mGeoLocationCallback != null){
+                } else {
+                    if (mGeoLocationCallback != null) {
                         mGeoLocationCallback.invoke(mGeoLocationOrigin, false, false);
                     }
                 }
@@ -445,9 +448,6 @@ public class HomeScreen extends AppCompatActivity implements OSSubscriptionObser
                 startActivity(intent);
                 SharedPreferences.clear(HomeScreen.this);
                 finish();
-                Uri webpage = Uri.parse(url);
-                intent = new Intent(Intent.ACTION_VIEW, webpage);
-                view.getContext().startActivity(intent);
                 //  return false;
             }
 
@@ -468,17 +468,16 @@ public class HomeScreen extends AppCompatActivity implements OSSubscriptionObser
             return super.shouldOverrideUrlLoading(view, url);
         }
 
+        @Override
+        public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
+            handler.proceed();
+        }  /////////////////////////////////////////////////////////////////////////////////////////////////////////////DELETE THIS FOR LIVE
+
 
         public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
             Toast.makeText(getApplicationContext(), "Failed loading app!", Toast.LENGTH_SHORT).show();
         }
 
-        /*   @Override
-           public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
-               handler.proceed();
-           }  /////////////////////////////////////////////////////////////////////////////////////////////////////////////DELETE THIS FOR LIVE
-
-   */
         @Override
         public void onPageFinished(WebView view, String url) {
             if (clearHistory) {
@@ -490,7 +489,7 @@ public class HomeScreen extends AppCompatActivity implements OSSubscriptionObser
     }
 
     /*-- checking and asking for required file permissions --*/
-    public boolean file_permission(){
+    public boolean file_permission() {
         if (Build.VERSION.SDK_INT >= 23 && (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) || ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED
                 || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(HomeScreen.this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO, Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, 1);

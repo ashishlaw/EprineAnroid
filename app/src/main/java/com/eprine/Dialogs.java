@@ -12,8 +12,6 @@ import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.eprine.R;
-
 public class Dialogs {
 
     static AlertDialog dialogProgress;
@@ -48,7 +46,8 @@ public class Dialogs {
     }
 
     public static void baseHideProgressDialog() {
-        dialogProgress.hide();
+        if (dialogProgress != null)
+            dialogProgress.hide();
         dialogProgress = null;
     }
 }
